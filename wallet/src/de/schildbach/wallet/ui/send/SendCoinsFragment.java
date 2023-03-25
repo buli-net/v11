@@ -95,6 +95,7 @@ import org.bitcoinj.base.Address;
 import org.bitcoinj.base.exceptions.AddressFormatException;
 import org.bitcoinj.base.Coin;
 import org.bitcoinj.core.InsufficientMoneyException;
+import org.bitcoinj.crypto.AesKey;
 import org.bitcoinj.crypto.EncodedPrivateKey;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.core.TransactionConfidence;
@@ -109,7 +110,6 @@ import org.bitcoinj.wallet.Wallet;
 import org.bitcoinj.wallet.Wallet.BalanceType;
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards;
 import org.bitcoinj.wallet.Wallet.DustySendRequested;
-import org.bouncycastle.crypto.params.KeyParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -662,7 +662,7 @@ public final class SendCoinsFragment extends Fragment {
         if (wallet.isEncrypted()) {
             new DeriveKeyTask(backgroundHandler, application.scryptIterationsTarget()) {
                 @Override
-                protected void onSuccess(final KeyParameter encryptionKey, final boolean wasChanged) {
+                protected void onSuccess(final AesKey encryptionKey, final boolean wasChanged) {
                     if (wasChanged)
                         WalletUtils.autoBackupWallet(activity, wallet);
                     signAndSendPayment(encryptionKey);
@@ -675,7 +675,7 @@ public final class SendCoinsFragment extends Fragment {
         }
     }
 
-    private void signAndSendPayment(final KeyParameter encryptionKey) {
+    private void signAndSendPayment(final AesKey encryptionKey) {
         setState(SendCoinsViewModel.State.SIGNING);
 
         // final payment intent
