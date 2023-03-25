@@ -21,7 +21,7 @@ import android.os.Handler;
 import android.os.Looper;
 import de.schildbach.wallet.Constants;
 import org.bitcoinj.base.Coin;
-import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.core.InsufficientMoneyException;
 import org.bitcoinj.core.Transaction;
 import org.bitcoinj.wallet.SendRequest;

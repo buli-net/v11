@@ -30,7 +30,7 @@ import de.schildbach.wallet.addressbook.AddressBookEntry;
 import de.schildbach.wallet.data.AbstractWalletLiveData;
 import de.schildbach.wallet.data.ConfigOwnNameLiveData;
 import org.bitcoinj.base.Address;
-import org.bitcoinj.core.ECKey;
+import org.bitcoinj.crypto.ECKey;
 import org.bitcoinj.base.LegacyAddress;
 import org.bitcoinj.utils.Threading;
 import org.bitcoinj.wallet.Wallet;
