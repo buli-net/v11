@@ -24,7 +24,6 @@ import android.bluetooth.BluetoothManager;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -146,8 +145,7 @@ public final class SettingsFragment extends PreferenceFragment implements OnPref
 
         bluetoothAddressPreference = (EditTextPreference) findPreference(Configuration.PREFS_KEY_BLUETOOTH_ADDRESS);
         bluetoothAddressPreference.setOnPreferenceChangeListener(this);
-        final InputFilter.AllCaps allCaps = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1 ?
-                new InputFilter.AllCaps(Locale.US) : new InputFilter.AllCaps();
+        final InputFilter.AllCaps allCaps = new InputFilter.AllCaps(Locale.US);
         final InputFilter.LengthFilter maxLength = new InputFilter.LengthFilter(BLUETOOTH_ADDRESS_LENGTH);
         final RestrictToHex hex = new RestrictToHex();
         bluetoothAddressPreference.getEditText().setFilters(new InputFilter[] { maxLength, allCaps, hex });
