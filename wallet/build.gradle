@@ -59,14 +59,14 @@ android {
         }
     }
 
-    flavorDimensions 'flavor'
+    flavorDimensions 'network'
     productFlavors {
         Testnet { // capital T because testnet flavor not allowed
-            dimension 'flavor'
+            dimension 'network'
             applicationIdSuffix '.wallet_test'
         }
         Mainnet {
-            dimension 'flavor'
+            dimension 'network'
             applicationIdSuffix '.wallet'
         }
     }
