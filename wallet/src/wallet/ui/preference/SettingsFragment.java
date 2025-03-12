@@ -105,7 +105,7 @@ public final class SettingsFragment extends PreferenceFragment implements OnPref
                 Html.fromHtml(getString(R.string.preferences_sync_mode_labels_full)) });
         syncModePreference.setDefaultValue(config.getSyncModeDefault().name());
         if (!application.fullSyncCapable())
-            removeOrDisablePreference(syncModePreference);
+            removePreference(syncModePreference);
 
         trustedPeerPreference = (EditTextPreference) findPreference(Configuration.PREFS_KEY_TRUSTED_PEERS);
         trustedPeerPreference.setOnPreferenceChangeListener(this);
@@ -117,26 +117,26 @@ public final class SettingsFragment extends PreferenceFragment implements OnPref
 
         final Preference enableExchangeRatesPreference = findPreference(Configuration.PREFS_KEY_ENABLE_EXCHANGE_RATES);
         if (!Constants.ENABLE_EXCHANGE_RATES)
-            removeOrDisablePreference(enableExchangeRatesPreference);
+            removePreference(enableExchangeRatesPreference);
 
         final Preference dataUsagePreference = findPreference(Configuration.PREFS_KEY_DATA_USAGE);
         dataUsagePreference.setIntent(new Intent(Settings.ACTION_IGNORE_BACKGROUND_DATA_RESTRICTIONS_SETTINGS,
                 Uri.parse("package:" + application.getPackageName())));
         if (dataUsagePreference.getIntent() == null || pm.resolveActivity(dataUsagePreference.getIntent(), 0) == null)
-            removeOrDisablePreference(dataUsagePreference);
+            removePreference(dataUsagePreference);
 
         final Preference batteryOptimizationPreference = findPreference(Configuration.PREFS_KEY_BATTERY_OPTIMIZATION);
         if (ContextCompat.checkSelfPermission(activity, Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS) == PackageManager.PERMISSION_GRANTED)
             batteryOptimizationPreference.setIntent(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                     Uri.parse("package:" + application.getPackageName())));
         if (powerManager.isIgnoringBatteryOptimizations(application.getPackageName()) || pm.resolveActivity(batteryOptimizationPreference.getIntent(), 0) == null)
-            removeOrDisablePreference(batteryOptimizationPreference);
+            removePreference(batteryOptimizationPreference);
 
         final Preference notificationsPreference = findPreference(Configuration.PREFS_KEY_NOTIFICATIONS);
         notificationsPreference.setIntent(new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, application.getPackageName()));
         if (notificationsPreference.getIntent() == null || pm.resolveActivity(notificationsPreference.getIntent(), 0) == null)
-            removeOrDisablePreference(notificationsPreference);
+            removePreference(notificationsPreference);
 
         ownNamePreference = findPreference(Configuration.PREFS_KEY_OWN_NAME);
         ownNamePreference.setOnPreferenceChangeListener(this);
@@ -245,11 +245,11 @@ public final class SettingsFragment extends PreferenceFragment implements OnPref
                 }
             }
         } else {
-            removeOrDisablePreference(bluetoothAddressPreference);
+            removePreference(bluetoothAddressPreference);
         }
     }
 
-    private void removeOrDisablePreference(final Preference preference) {
+    private void removePreference(final Preference preference) {
         preference.getParent().removePreference(preference);
     }
 
