@@ -37,14 +37,6 @@
             android:action="android.intent.action.VIEW"
             android:data="https://bitcoin.stackexchange.com/questions/tagged/bitcoin-wallet-app" />
     </Preference>
-    <Preference
-        android:key="about_twitter"
-        android:summary="\@bitcoin_wallet"
-        android:title="Twitter">
-        <intent
-            android:action="android.intent.action.VIEW"
-            android:data="https://twitter.com/bitcoin_wallet" />
-    </Preference>
 
     <PreferenceCategory
         android:title="@string/about_category_credits">
