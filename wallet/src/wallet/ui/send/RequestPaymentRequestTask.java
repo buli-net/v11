@@ -63,14 +63,9 @@ public abstract class RequestPaymentRequestTask {
     }
 
     public final static class HttpRequestTask extends RequestPaymentRequestTask {
-        @Nullable
-        private final String userAgent;
 
-        public HttpRequestTask(final Handler backgroundHandler, final ResultCallback resultCallback,
-                @Nullable final String userAgent) {
+        public HttpRequestTask(final Handler backgroundHandler, final ResultCallback resultCallback) {
             super(backgroundHandler, resultCallback);
-
-            this.userAgent = userAgent;
         }
 
         @Override
@@ -83,11 +78,9 @@ public abstract class RequestPaymentRequestTask {
                 request.cacheControl(new CacheControl.Builder().noCache().build());
                 final Headers.Builder headers = new Headers.Builder();
                 headers.add("Accept", PaymentProtocol.MIMETYPE_PAYMENTREQUEST);
-                if (userAgent != null)
-                    headers.add("User-Agent", userAgent);
                 request.headers(headers.build());
 
-                final Call call = Constants.HTTP_CLIENT.newCall(request.build());
+                final Call call = Constants.HTTP_CLIENT_WITHOUT_USER_AGENT.newCall(request.build());
                 try {
                     final Response response = call.execute();
                     if (response.isSuccessful()) {

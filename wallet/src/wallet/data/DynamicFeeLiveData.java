@@ -51,7 +51,6 @@ import java.util.Map;
 
 public class DynamicFeeLiveData extends LiveData<Map<FeeCategory, Coin>> {
     private final HttpUrl dynamicFeesUrl;
-    private final String userAgent;
     private final AssetManager assets;
     private final File dynamicFeesFile;
     private final File tempFile;
@@ -63,7 +62,6 @@ public class DynamicFeeLiveData extends LiveData<Map<FeeCategory, Coin>> {
         final int versionNameSplit = packageInfo.versionName.indexOf('-');
         this.dynamicFeesUrl = HttpUrl.parse(Constants.DYNAMIC_FEES_URL
                 + (versionNameSplit >= 0 ? packageInfo.versionName.substring(versionNameSplit) : ""));
-        this.userAgent = WalletApplication.httpUserAgent(packageInfo.versionName);
         this.assets = application.getAssets();
         this.dynamicFeesFile = new File(application.getFilesDir(), Constants.Files.FEES_ASSET);
         this.tempFile = new File(application.getCacheDir(), Constants.Files.FEES_ASSET + ".temp");
@@ -80,7 +78,7 @@ public class DynamicFeeLiveData extends LiveData<Map<FeeCategory, Coin>> {
     private Map<FeeCategory, Coin> loadInBackground() {
         try {
             final Map<FeeCategory, Coin> staticFees = parseFees(assets.open(Constants.Files.FEES_ASSET));
-            fetchDynamicFees(dynamicFeesUrl, tempFile, dynamicFeesFile, userAgent);
+            fetchDynamicFees(dynamicFeesUrl, tempFile, dynamicFeesFile);
             if (!dynamicFeesFile.exists())
                 return staticFees;
 
@@ -149,19 +147,17 @@ public class DynamicFeeLiveData extends LiveData<Map<FeeCategory, Coin>> {
         return dynamicFees;
     }
 
-    private static void fetchDynamicFees(final HttpUrl url, final File tempFile, final File targetFile,
-            final String userAgent) {
+    private static void fetchDynamicFees(final HttpUrl url, final File tempFile, final File targetFile) {
         final Stopwatch watch = Stopwatch.createStarted();
 
         final Request.Builder request = new Request.Builder();
         request.url(url);
         final Headers.Builder headers = new Headers.Builder();
-        headers.add("User-Agent", userAgent);
         if (targetFile.exists())
             headers.add("If-Modified-Since", Instant.ofEpochMilli(targetFile.lastModified()));
         request.headers(headers.build());
 
-        final Call call = Constants.HTTP_CLIENT.newCall(request.build());
+        final Call call = Constants.HTTP_CLIENT_WITHOUT_USER_AGENT.newCall(request.build());
         try {
             final Response response = call.execute();
             final int status = response.code();

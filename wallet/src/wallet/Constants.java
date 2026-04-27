@@ -21,7 +21,10 @@ import android.os.Build;
 import com.google.common.io.BaseEncoding;
 import okhttp3.ConnectionSpec;
 import okhttp3.HttpUrl;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
 import org.bitcoinj.base.BitcoinNetwork;
 import org.bitcoinj.base.Coin;
@@ -35,6 +38,7 @@ import org.bitcoinj.params.TestNet3Params;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
@@ -160,7 +164,7 @@ public final class Constants {
     /** Number of confirmations until a transaction is fully confirmed. */
     public static final int MAX_NUM_CONFIRMATIONS = 7;
 
-    /** User-agent to use for network access. */
+    /** User-agent to use for the Bitcoin network. */
     public static final String USER_AGENT = "Bitcoin Wallet";
 
     /** Default currency to use if all default mechanisms fail. */
@@ -261,6 +265,7 @@ public final class Constants {
 
     /** Shared HTTP client, can reuse connections */
     public static final OkHttpClient HTTP_CLIENT;
+    public static final OkHttpClient HTTP_CLIENT_WITHOUT_USER_AGENT;
     static {
         final HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(
                 new HttpLoggingInterceptor.Logger() {
@@ -280,6 +285,16 @@ public final class Constants {
         httpClientBuilder.readTimeout(15, TimeUnit.SECONDS);
         httpClientBuilder.addInterceptor(loggingInterceptor);
         HTTP_CLIENT = httpClientBuilder.build();
+        HTTP_CLIENT_WITHOUT_USER_AGENT = HTTP_CLIENT.newBuilder().addNetworkInterceptor(new Interceptor() {
+            @Override
+            public Response intercept(Chain chain) throws IOException {
+                Request request = chain.request();
+                return chain.proceed(request
+                        .newBuilder()
+                        .removeHeader("User-Agent")
+                        .build());
+            }
+        }).build();
     }
 
     private static final Logger log = LoggerFactory.getLogger(Constants.class);

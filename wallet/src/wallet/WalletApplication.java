@@ -42,7 +42,6 @@ import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.util.concurrent.SettableFuture;
-import org.bitcoinj.core.VersionMessage;
 import org.bitcoinj.crypto.MnemonicCode;
 import org.bitcoinj.utils.ContextPropagatingThreadFactory;
 import org.bitcoinj.utils.Threading;
@@ -320,16 +319,6 @@ public class WalletApplication extends Application {
             return packageName.substring(index + 1);
         else
             return null;
-    }
-
-    public static String httpUserAgent(final String versionName) {
-        final VersionMessage versionMessage = new VersionMessage(Constants.NETWORK_PARAMETERS, 0);
-        versionMessage.appendToSubVer(Constants.USER_AGENT, versionName, null);
-        return versionMessage.subVer;
-    }
-
-    public String httpUserAgent() {
-        return httpUserAgent(packageInfo().versionName);
     }
 
     public int maxConnectedPeers() {

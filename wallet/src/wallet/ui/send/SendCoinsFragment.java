@@ -790,7 +790,7 @@ public final class SendCoinsFragment extends Fragment {
 
                 if (viewModel.paymentIntent.isHttpPaymentUrl()) {
                     new DirectPaymentTask.HttpPaymentTask(backgroundHandler, callback,
-                            viewModel.paymentIntent.paymentUrl, application.httpUserAgent()).send(payment);
+                            viewModel.paymentIntent.paymentUrl).send(payment);
                 } else if (viewModel.paymentIntent.isBluetoothPaymentUrl() && bluetoothAdapter != null
                         && bluetoothAdapter.isEnabled()) {
                     new DirectPaymentTask.BluetoothPaymentTask(backgroundHandler, callback, bluetoothAdapter,
@@ -1281,7 +1281,7 @@ public final class SendCoinsFragment extends Fragment {
         };
 
         if (!Bluetooth.isBluetoothUrl(viewModel.paymentIntent.paymentRequestUrl))
-            new RequestPaymentRequestTask.HttpRequestTask(backgroundHandler, callback, application.httpUserAgent())
+            new RequestPaymentRequestTask.HttpRequestTask(backgroundHandler, callback)
                     .requestPaymentRequest(viewModel.paymentIntent.paymentRequestUrl);
         else
             new RequestPaymentRequestTask.BluetoothRequestTask(backgroundHandler, callback, bluetoothAdapter)

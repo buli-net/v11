@@ -66,15 +66,11 @@ public abstract class DirectPaymentTask {
 
     public final static class HttpPaymentTask extends DirectPaymentTask {
         private final String url;
-        @Nullable
-        private final String userAgent;
 
-        public HttpPaymentTask(final Handler backgroundHandler, final ResultCallback resultCallback, final String url,
-                @Nullable final String userAgent) {
+        public HttpPaymentTask(final Handler backgroundHandler, final ResultCallback resultCallback, final String url) {
             super(backgroundHandler, resultCallback);
 
             this.url = url;
-            this.userAgent = userAgent;
         }
 
         @Override
@@ -87,8 +83,6 @@ public abstract class DirectPaymentTask {
                 request.cacheControl(new CacheControl.Builder().noCache().build());
                 final Headers.Builder headers = new Headers.Builder();
                 headers.add("Accept", PaymentProtocol.MIMETYPE_PAYMENTACK);
-                if (userAgent != null)
-                    headers.add("User-Agent", userAgent);
                 request.headers(headers.build());
                 request.post(new RequestBody() {
                     @Override
@@ -107,7 +101,7 @@ public abstract class DirectPaymentTask {
                     }
                 });
 
-                final Call call = Constants.HTTP_CLIENT.newCall(request.build());
+                final Call call = Constants.HTTP_CLIENT_WITHOUT_USER_AGENT.newCall(request.build());
                 try {
                     final Response response = call.execute();
                     if (response.isSuccessful()) {

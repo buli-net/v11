@@ -115,12 +115,9 @@ public class AlertDialogsViewModel extends AndroidViewModel {
                 request.url(versionUrl);
                 final Headers.Builder headers = new Headers.Builder();
                 headers.add("Accept-Charset", "utf-8");
-                final String userAgent = application.httpUserAgent();
-                if (userAgent != null)
-                    headers.add("User-Agent", userAgent);
                 request.headers(headers.build());
 
-                final Call call = Constants.HTTP_CLIENT.newCall(request.build());
+                final Call call = Constants.HTTP_CLIENT_WITHOUT_USER_AGENT.newCall(request.build());
 
                 final Response response = call.execute();
                 if (response.isSuccessful()) {

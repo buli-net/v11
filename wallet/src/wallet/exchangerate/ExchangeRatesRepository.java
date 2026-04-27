@@ -44,7 +44,6 @@ public class ExchangeRatesRepository {
 
     private final WalletApplication application;
     private final Configuration config;
-    private final String userAgent;
     private final ExchangeRatesDatabase db;
     private final ExchangeRateDao dao;
     private final AtomicReference<Instant> lastUpdated = new AtomicReference<>();
@@ -58,7 +57,6 @@ public class ExchangeRatesRepository {
     public ExchangeRatesRepository(final WalletApplication application) {
         this.application = application;
         this.config = application.getConfiguration();
-        this.userAgent = null;
 
         this.db = ExchangeRatesDatabase.getDatabase(application);
         this.dao = db.exchangeRateDao();
@@ -88,10 +86,6 @@ public class ExchangeRatesRepository {
         final Request.Builder request = new Request.Builder();
         request.url(coinGecko.url());
         final Headers.Builder headers = new Headers.Builder();
-        if (userAgent != null)
-            headers.add("User-Agent", userAgent);
-        else
-            headers.removeAll("User-Agent");
         headers.add("Accept", coinGecko.mediaType().toString());
         request.headers(headers.build());
 
