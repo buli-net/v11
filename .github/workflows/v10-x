@@ -2,7 +2,7 @@
 # FILE: .github/workflows/build-debug.yml
 # MỤC ĐÍCH: Tạo APK đã được ký bằng chữ ký debug mặc định của Android SDK
 #            (dùng cho kiểm thử, không dùng để phát hành)
-# OUTPUT:   bitcoin-wallet-debug.apk (có chữ ký Android Debug)
+# OUTPUT:   bitcoin-wallet-debug.apk (có chữ ký Android Debug).
 # =================================================================
 
 # Tên workflow hiển thị trên GitHub Actions
