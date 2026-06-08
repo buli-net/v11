@@ -24,8 +24,8 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
-          ref: 10.26              # Lấy nhánh main
-          fetch-depth: 1         # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
+          ref: v10.26              # Lấy nhánh main
+          fetch-depth: 0         # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
 
       # ----- BƯỚC 2: Cài JDK 17 (cần cho Android SDK) -----
       - name: Setup JDK 17 for Android SDK
