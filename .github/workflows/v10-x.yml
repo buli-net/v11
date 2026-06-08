@@ -46,7 +46,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '11'
+          java-version: '17'
 
       # ----- BƯỚC 5: Cài Gradle 6.9.4 (phiên bản Gradle mà dự án đang dùng) -----
       - name: Setup Gradle 6.9.4
