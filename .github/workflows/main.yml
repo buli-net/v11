@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet (Full Resources)
+name: Build Bitcoin Wallet (MainnetDebug) from Tag v11.04
 
 on:
   workflow_dispatch:
@@ -8,21 +8,17 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout source code (main branch)
-        uses: actions/checkout@v4
-        with:
-          ref: v10.26
-          fetch-depth: 1
+      - name: Clone from GitLab with tag v11.04
+        run: |
+          git clone --depth 1 --branch v11.04 https://gitlab.com/bitcoin-wallet/bitcoin-wallet.git .
 
-      # ----- Cài JDK 17 chỉ dùng cho SDK manager -----
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      # ----- Cài Android SDK mới nhất, xoá cache lỗi -----
-      - name: Install Android SDK (clean)
+      - name: Install Android SDK
         run: |
           rm -rf $HOME/.android $HOME/android-sdk
           mkdir -p $HOME/android-sdk/cmdline-tools
@@ -41,7 +37,6 @@ jobs:
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
 
-      # ----- JDK 11 để build (Gradle 6.9.4 tương thích) -----
       - name: Setup JDK 11 for Gradle
         uses: actions/setup-java@v4
         with:
@@ -53,8 +48,7 @@ jobs:
         with:
           gradle-version: '6.9.4'
 
-      # ----- Force tất cả dependency để tránh xung đột -----
-      - name: Fix dependencies (Guava, Lifecycle, Activity, Core)
+      - name: Fix dependencies
         run: |
           mkdir -p ~/.gradle/init.d
           cat > ~/.gradle/init.d/fix-all.gradle <<'EOF'
@@ -65,59 +59,45 @@ jobs:
             }
             configurations.all {
               resolutionStrategy {
-                // Guava
                 force 'com.google.guava:guava:31.1-android'
                 force 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
                 force 'com.google.guava:failureaccess:1.0.1'
-                // AndroidX Lifecycle
                 force 'androidx.lifecycle:lifecycle-viewmodel:2.6.2'
                 force 'androidx.lifecycle:lifecycle-livedata:2.6.2'
                 force 'androidx.lifecycle:lifecycle-runtime:2.6.2'
-                force 'androidx.lifecycle:lifecycle-common:2.6.2'
                 force 'androidx.lifecycle:lifecycle-extensions:2.2.0'
-                // AndroidX Arch Core
                 force 'androidx.arch.core:core-runtime:2.2.0'
-                force 'androidx.arch.core:core-common:2.2.0'
-                // AndroidX Core, Activity (tránh lỗi core-viewtree)
                 force 'androidx.core:core:1.12.0'
                 force 'androidx.activity:activity:1.8.2'
                 force 'androidx.appcompat:appcompat:1.6.1'
                 force 'androidx.fragment:fragment:1.6.2'
-                // Xử lý mọi dependency
                 eachDependency { details ->
                   if (details.requested.group == 'com.google.guava') {
                     if (details.requested.name == 'guava') details.useVersion '31.1-android'
                     if (details.requested.name == 'listenablefuture') details.useVersion '9999.0-empty-to-avoid-conflict-with-guava'
                     if (details.requested.name == 'failureaccess') details.useVersion '1.0.1'
                   }
-                  if (details.requested.group == 'androidx.lifecycle') {
-                    details.useVersion '2.6.2'
-                  }
-                  if (details.requested.group == 'androidx.arch.core') {
-                    details.useVersion '2.2.0'
-                  }
-                  if (details.requested.group == 'androidx.core') {
-                    details.useVersion '1.12.0'
-                  }
-                  if (details.requested.group == 'androidx.activity') {
-                    details.useVersion '1.8.2'
-                  }
+                  if (details.requested.group == 'androidx.lifecycle') details.useVersion '2.6.2'
+                  if (details.requested.group == 'androidx.arch.core') details.useVersion '2.2.0'
+                  if (details.requested.group == 'androidx.core') details.useVersion '1.12.0'
+                  if (details.requested.group == 'androidx.activity') details.useVersion '1.8.2'
                 }
               }
             }
           }
           EOF
 
-      # ----- Build tất cả các variant để lấy APK đầy đủ -----
-      - name: Build all APKs
+      - name: Build MainnetDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
-          gradle clean :wallet:assemble --stacktrace --no-daemon
+          gradle :wallet:assembleMainnetDebug --stacktrace --no-daemon
 
-      # ----- Tìm tất cả APK, lọc lấy file có size > 5MB (tránh file rỗng) -----
-      - name: Upload full APKs
+      - name: List APK files with sizes
+        run: |
+          find wallet/build/outputs/apk -name "*.apk" -exec ls -lh {} \;
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: bitcoin-wallet-apks
-          path: |
-            wallet/build/outputs/apk/**/*.apk
+          name: mainnet-debug-apk
+          path: wallet/build/outputs/apk/**/*.apk
