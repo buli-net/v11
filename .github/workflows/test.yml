@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - v11
+name: Build Wallet 10.x
 
 on:
   workflow_dispatch:
@@ -7,49 +7,33 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: v11.02
           fetch-depth: 1
 
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
+      # SDK cần JDK 17
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Setup Android SDK 34
-        uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-30 build-tools;30.0.3'
 
-      - name: Setup Gradle 7.6.1
-        uses: gradle/actions/setup-gradle@v3
+      # Build cần JDK 11 + Gradle 6.9.4
+      - uses: actions/setup-java@v4
         with:
-          gradle-version: '7.6.1'
+          distribution: temurin
+          java-version: '11'
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '6.9.4'
 
-      - name: Fix Guava
-        run: |
+      - run: |
           mkdir -p ~/.gradle/init.d
-          cat > ~/.gradle/init.d/fix-guava.gradle <<'EOF'
-          allprojects {
-            configurations.all {
-              resolutionStrategy {
-                force 'com.google.guava:guava:31.1-android'
-                force 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
-              }
-            }
-          }
-          EOF
+          echo "allprojects{configurations.all{resolutionStrategy{force 'com.google.guava:guava:31.1-android'}}}" > ~/.gradle/init.d/fix.gradle
 
-      - name: Build
-        run: |
+      - run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
-          gradle :wallet:assembleProdDebug --no-daemon --stacktrace
-
-      - name: Upload
-        uses: actions/upload-artifact@v4
-        with:
-          name: v11-debug
-          path: wallet/build/outputs/apk/prod/debug/*.apk
+          gradle :wallet:assembleProdDebug --no-daemon
