@@ -10,7 +10,7 @@ jobs:
       - name: Checkout GitLab source
         uses: actions/checkout@v4
         with:
-          repository: buli-net/v11-gitlab   # sau khi import từ GitLab
+          repository: buli-net/v11   # sau khi import từ GitLab
           ref: v11.02
           fetch-depth: 1
 
