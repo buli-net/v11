@@ -48,7 +48,10 @@ jobs:
             }
             afterEvaluate {
               if (it.hasProperty('android')) {
-                android.buildTypes.all { it.minifyEnabled false }
+                android.buildTypes.all {
+                  it.minifyEnabled false
+                  it.shrinkResources false
+                }
               }
             }
           }
