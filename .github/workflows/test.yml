@@ -12,19 +12,24 @@ jobs:
           ref: v11.02
           fetch-depth: 1
 
-      - uses: actions/setup-java@v4
+      - name: Setup JDK 17 for SDK
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - name: Setup Android SDK 30
+        uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-30 build-tools;30.0.3'
 
-      - uses: actions/setup-java@v4
+      - name: Setup JDK 8 for build
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '11'
-      - uses: gradle/actions/setup-gradle@v3
+          java-version: '8'
+
+      - name: Setup Gradle 6.9.4
+        uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '6.9.4'
 
@@ -46,6 +51,10 @@ jobs:
                 force 'androidx.arch.core:core-common:2.1.0'
               }
             }
+            tasks.withType(JavaCompile) {
+              sourceCompatibility = '1.8'
+              targetCompatibility = '1.8'
+            }
             afterEvaluate {
               if (it.hasProperty('android')) {
                 android.buildTypes.all {
@@ -60,6 +69,7 @@ jobs:
       - name: Build Debug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
+          export JAVA_HOME=$JAVA_HOME_8_X64
           gradle :wallet:assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
