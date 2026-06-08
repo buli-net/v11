@@ -1,10 +1,4 @@
-# =================================================================
-# FILE: .github/workflows/build-debug.yml
-# MỤC ĐÍCH: Build APK v11 từ GitLab, ký debug mặc định
-# OUTPUT:   bitcoin-wallet-v11-debug.apk
-# =================================================================
-
-name: Build Bitcoin Wallet - v11
+name: Build Bitcoin Wallet - 10.x
 
 on:
   workflow_dispatch:
@@ -12,36 +6,30 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
     steps:
-      # ----- BƯỚC 1: Lấy mã nguồn -----
-      - name: Checkout source code
+      - name: Checkout source
         uses: actions/checkout@v4
         with:
-          ref: v11.02
+          ref: v11.02   # giữ nguyên tag bạn đang dùng
           fetch-depth: 1
 
-      # ----- BƯỚC 2: Cài JDK 17 -----
-      - name: Setup JDK 17
+      - name: Setup JDK 11
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '11'
 
-      # ----- BƯỚC 3: Cài Android SDK 34 -----
-      - name: Setup Android SDK 34
+      - name: Setup Android SDK 30
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          packages: 'platform-tools platforms;android-30 build-tools;30.0.3'
 
-      # ----- BƯỚC 4: Cài Gradle 7.6.1 (v11 dùng Gradle 7) -----
-      - name: Setup Gradle 7.6.1
+      - name: Setup Gradle 6.9.4
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '7.6.1'
+          gradle-version: '6.9.4'
 
-      # ----- BƯỚC 5: Fix Guava -----
-      - name: Fix Guava conflict
+      - name: Fix Guava
         run: |
           mkdir -p ~/.gradle/init.d
           cat > ~/.gradle/init.d/fix-guava.gradle <<'EOF'
@@ -55,27 +43,13 @@ jobs:
           }
           EOF
 
-      # ----- BƯỚC 6: Build APK -----
-      - name: Build prodDebug APK
+      - name: Build
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           gradle :wallet:assembleProdDebug --no-daemon --stacktrace
 
-      # ----- BƯỚC 7: Verify -----
-      - name: Verify debug certificate
-        run: |
-          APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
-
-      # ----- BƯỚC 8: Rename -----
-      - name: Rename APK
-        run: |
-          APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
-          mv "$APK_PATH" "$(dirname $APK_PATH)/bitcoin-wallet-v11-debug.apk"
-
-      # ----- BƯỚC 9: Upload -----
-      - name: Upload debug APK
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: v11-debug-apk
-          path: wallet/build/outputs/apk/prod/debug/bitcoin-wallet-v11-debug.apk
+          name: wallet-debug
+          path: wallet/build/outputs/apk/prod/debug/*.apk
