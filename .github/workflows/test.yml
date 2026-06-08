@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet v11
+name: Build Bitcoin Wallet with Debug Logs
 
 on:
   workflow_dispatch:
@@ -6,28 +6,112 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout GitLab source
-        uses: actions/checkout@v4
-        with:
-          repository: buli-net/v11   # sau khi import từ GitLab
-          ref: v11.02
-          fetch-depth: 1
 
-      - name: Setup JDK 17
+    steps:
+      - name: Checkout from GitLab (tag v11.04)
+        run: |
+          git clone --depth 1 --branch v11.04 https://gitlab.com/bitcoin-wallet/bitcoin-wallet.git .
+
+      - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK 34
-        uses: android-actions/setup-android@v3
+      - name: Install Android SDK
+        run: |
+          rm -rf $HOME/.android $HOME/android-sdk
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          cd $HOME/android-sdk
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          unzip -q commandlinetools-linux-11076708_latest.zip
+          mv cmdline-tools cmdline-tools-temp
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools-temp/* cmdline-tools/latest/
+          rm commandlinetools-linux-11076708_latest.zip
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          rm -rf $ANDROID_SDK_ROOT/.temp $ANDROID_SDK_ROOT/.cache $HOME/.android/cache
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
 
-      - name: Build
-        run: ./gradlew :wallet:assembleDebug --no-daemon
+      - name: Setup JDK 11 for Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
 
-      - name: Upload APK
+      - name: Setup Gradle 6.9.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '6.9.4'
+
+      - name: Fix dependencies (same as before)
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat > ~/.gradle/init.d/fix-all.gradle <<'EOF'
+          allprojects {
+            repositories {
+              google()
+              mavenCentral()
+            }
+            configurations.all {
+              resolutionStrategy {
+                force 'com.google.guava:guava:31.1-android'
+                force 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
+                force 'com.google.guava:failureaccess:1.0.1'
+                force 'androidx.lifecycle:lifecycle-viewmodel:2.6.2'
+                force 'androidx.lifecycle:lifecycle-livedata:2.6.2'
+                force 'androidx.lifecycle:lifecycle-runtime:2.6.2'
+                force 'androidx.lifecycle:lifecycle-extensions:2.2.0'
+                force 'androidx.arch.core:core-runtime:2.2.0'
+                force 'androidx.core:core:1.12.0'
+                force 'androidx.activity:activity:1.8.2'
+                force 'androidx.appcompat:appcompat:1.6.1'
+                force 'androidx.fragment:fragment:1.6.2'
+                eachDependency { details ->
+                  if (details.requested.group == 'com.google.guava') {
+                    if (details.requested.name == 'guava') details.useVersion '31.1-android'
+                    if (details.requested.name == 'listenablefuture') details.useVersion '9999.0-empty-to-avoid-conflict-with-guava'
+                    if (details.requested.name == 'failureaccess') details.useVersion '1.0.1'
+                  }
+                  if (details.requested.group == 'androidx.lifecycle') details.useVersion '2.6.2'
+                  if (details.requested.group == 'androidx.arch.core') details.useVersion '2.2.0'
+                  if (details.requested.group == 'androidx.core') details.useVersion '1.12.0'
+                  if (details.requested.group == 'androidx.activity') details.useVersion '1.8.2'
+                }
+              }
+            }
+          }
+          EOF
+
+      # Build với chế độ INFO để xem chi tiết task
+      - name: Build MainnetDebug APK with --info
+        run: |
+          export ANDROID_HOME=$ANDROID_SDK_ROOT
+          gradle :wallet:assembleMainnetDebug --info --stacktrace --no-daemon
+
+      # Xuất thông tin về APK (minSdkVersion, permissions) để kiểm tra tương thích
+      - name: Analyze APK
+        run: |
+          APK_PATH=$(find wallet/build/outputs/apk -name "*.apk" | head -1)
+          if [ -f "$APK_PATH" ]; then
+            echo "APK: $APK_PATH"
+            # Dùng aapt2 để lấy thông tin
+            $ANDROID_HOME/build-tools/34.0.0/aapt2 dump badging "$APK_PATH" || echo "aapt2 failed"
+            echo "=== Dumping AndroidManifest.xml ==="
+            $ANDROID_HOME/build-tools/34.0.0/aapt2 dump xmltree "$APK_PATH" AndroidManifest.xml || echo "Cannot dump manifest"
+          else
+            echo "No APK found"
+          fi
+
+      - name: Upload APK and logs
         uses: actions/upload-artifact@v4
         with:
-          name: bitcoin-wallet-v11
-          path: wallet/build/outputs/apk/debug/*.apk
+          name: debug-build-with-logs
+          path: |
+            wallet/build/outputs/apk/**/*.apk
+            wallet/build/reports/**/*.html
+            wallet/build/outputs/logs/**/*.txt
