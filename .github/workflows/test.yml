@@ -14,15 +14,14 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      # ----- BƯỚC 1: Lấy mã nguồn từ GitLab (đã import) -----
+      # ----- BƯỚC 1: Lấy mã nguồn -----
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
-          # nếu bạn import GitLab vào repo này, dùng tag v11.02
           ref: v11.02
           fetch-depth: 1
 
-      # ----- BƯỚC 2: Cài JDK 17 (v11 yêu cầu Java 17) -----
+      # ----- BƯỚC 2: Cài JDK 17 -----
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
@@ -35,7 +34,13 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
 
-      # ----- BƯỚC 4: Chỉ fix Guava (không ép AndroidX) -----
+      # ----- BƯỚC 4: Cài Gradle 7.6.1 (v11 dùng Gradle 7) -----
+      - name: Setup Gradle 7.6.1
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '7.6.1'
+
+      # ----- BƯỚC 5: Fix Guava -----
       - name: Fix Guava conflict
         run: |
           mkdir -p ~/.gradle/init.d
@@ -50,26 +55,25 @@ jobs:
           }
           EOF
 
-      # ----- BƯỚC 5: Build APK debug (dùng Gradle wrapper của dự án) -----
+      # ----- BƯỚC 6: Build APK -----
       - name: Build prodDebug APK
         run: |
           export ANDROID_HOME=$ANDROID_SDK_ROOT
-          ./gradlew :wallet:assembleProdDebug --no-daemon --stacktrace
+          gradle :wallet:assembleProdDebug --no-daemon --stacktrace
 
-      # ----- BƯỚC 6: Xác minh chữ ký debug -----
+      # ----- BƯỚC 7: Verify -----
       - name: Verify debug certificate
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
-          echo "=== Verify APK ==="
           $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose --print-certs "$APK_PATH"
 
-      # ----- BƯỚC 7: Đổi tên -----
+      # ----- BƯỚC 8: Rename -----
       - name: Rename APK
         run: |
           APK_PATH=$(find wallet/build/outputs/apk/prod/debug -name "*.apk" | head -1)
           mv "$APK_PATH" "$(dirname $APK_PATH)/bitcoin-wallet-v11-debug.apk"
 
-      # ----- BƯỚC 8: Upload artifact -----
+      # ----- BƯỚC 9: Upload -----
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
