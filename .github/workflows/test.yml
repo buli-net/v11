@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - 10.x
+name: Build Bitcoin Wallet - 11
 
 on:
   workflow_dispatch:
@@ -14,7 +14,6 @@ jobs:
           ref: v11.02
           fetch-depth: 1
 
-      # 1) JDK 17 để cài SDK (sdkmanager yêu cầu 17)
       - name: Setup JDK 17 for SDK
         uses: actions/setup-java@v4
         with:
@@ -26,7 +25,6 @@ jobs:
         with:
           packages: 'platform-tools platforms;android-30 build-tools;30.0.3'
 
-      # 2) Hạ xuống JDK 11 để build code cũ
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v4
         with:
@@ -38,15 +36,23 @@ jobs:
         with:
           gradle-version: '6.9.4'
 
-      - name: Fix Guava conflict
+      - name: Fix dependencies
         run: |
           mkdir -p ~/.gradle/init.d
-          cat > ~/.gradle/init.d/fix-guava.gradle <<'EOF'
+          cat > ~/.gradle/init.d/fix-deps.gradle <<'EOF'
           allprojects {
+            repositories {
+              google()
+              mavenCentral()
+            }
             configurations.all {
               resolutionStrategy {
                 force 'com.google.guava:guava:31.1-android'
                 force 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
+                force 'androidx.lifecycle:lifecycle-viewmodel:2.2.0'
+                force 'androidx.lifecycle:lifecycle-livedata:2.2.0'
+                force 'androidx.lifecycle:lifecycle-common:2.2.0'
+                force 'androidx.lifecycle:lifecycle-runtime:2.2.0'
               }
             }
           }
