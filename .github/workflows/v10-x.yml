@@ -6,7 +6,7 @@
 # =================================================================
 
 # Tên workflow hiển thị trên GitHub Actions
-name: Build Bitcoin Wallet - Debug
+name: Build Bitcoin Wallet - 10-x
 
 # Chỉ chạy khi người dùng bấm nút "Run workflow" (không tự động)
 on:
@@ -24,8 +24,8 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
-          ref: main               # Lấy nhánh main
-          fetch-depth: 0          # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
+          ref: 10.26              # Lấy nhánh main
+          fetch-depth: 1         # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
 
       # ----- BƯỚC 2: Cài JDK 17 (cần cho Android SDK) -----
       - name: Setup JDK 17 for Android SDK
