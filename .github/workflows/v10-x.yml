@@ -24,7 +24,7 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
-          ref: v10.26              # Lấy nhánh main
+          ref: v11.03              # Lấy nhánh main
           fetch-depth: 0         # Lấy toàn bộ lịch sử commit (cần cho một số tác vụ)
 
       # ----- BƯỚC 2: Cài JDK 17 (cần cho Android SDK) -----
@@ -89,7 +89,7 @@ jobs:
           # Thiết lập biến môi trường ANDROID_HOME trỏ đến SDK đã cài
           export ANDROID_HOME=$ANDROID_SDK_ROOT
           # Thiết lập JAVA_HOME dùng JDK 11
-          export JAVA_HOME=$JAVA_HOME_11_X64
+          export JAVA_HOME=$JAVA_HOME_17_X64
           # Chạy Gradle task assembleProdDebug
           # --no-daemon: không dùng Gradle daemon (tránh lỗi trên CI)
           # -Pandroid.buildToolsVersion=34.0.0: truyền tham số buildToolsVersion
