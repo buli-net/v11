@@ -11,7 +11,7 @@ jobs:
       - name: Checkout source code (main branch)
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: v11.02
           fetch-depth: 0
 
       # ----- Cài JDK 17 chỉ dùng cho SDK manager -----
