@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet - 11
+name: Build Bitcoin Wallet xxx
 
 on:
   workflow_dispatch:
@@ -53,6 +53,8 @@ jobs:
                 force 'androidx.lifecycle:lifecycle-livedata:2.2.0'
                 force 'androidx.lifecycle:lifecycle-common:2.2.0'
                 force 'androidx.lifecycle:lifecycle-runtime:2.2.0'
+                force 'androidx.arch.core:core-runtime:2.1.0'
+                force 'androidx.arch.core:core-common:2.1.0'
               }
             }
           }
