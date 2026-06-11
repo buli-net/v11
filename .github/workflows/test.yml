@@ -1,4 +1,4 @@
-name: Reproducible Build (Dockerfile style)
+name: Reproducible Build (All Networks)
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # ----- SỬ DỤNG JDK 17 ĐỂ CHẠY SDKMANAGER (action setup-android yêu cầu) -----
+      # ----- JDK 17 để chạy sdkmanager (action setup-android yêu cầu) -----
       - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v4
         with:
@@ -25,16 +25,15 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
-          # Mặc định accept license tự động
 
-      # ----- SAU KHI SDK ĐÃ SẴN SÀNG, CHUYỂN SANG JDK 11 ĐỂ BUILD -----
+      # ----- Chuyển về JDK 11 để build (phù hợp với sourceCompatibility 1.8) -----
       - name: Setup JDK 11 for build
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '11'
 
-      # ----- CÀI GRADLE 6.9.4 PHÙ HỢP VỚI PROJECT -----
+      # ----- Cài Gradle 6.9.4 (đúng yêu cầu của project) -----
       - name: Install Gradle 6.9.4
         run: |
           wget https://services.gradle.org/distributions/gradle-6.9.4-bin.zip
@@ -42,20 +41,25 @@ jobs:
           echo "/opt/gradle-6.9.4/bin" >> $GITHUB_PATH
           gradle --version
 
-      # ----- BUILD 2 BẢN RELEASE (HOẶC 4 BẢN) -----
-      - name: Build release APKs (assembleRelease)
+      # ----- Tạo các thư mục sourceSets nếu chưa có (tránh lỗi resource) -----
+      - name: Ensure source set directories exist
         run: |
-          gradle :wallet:assembleRelease --no-daemon --stacktrace
-          # Để build cả 4 loại (devDebug, devRelease, prodDebug, prodRelease) thay dòng trên bằng:
-          # gradle :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease --no-daemon --stacktrace
+          mkdir -p wallet/res-mainnet wallet/assets-mainnet
+          mkdir -p wallet/res-signet wallet/assets-signet
+
+      # ----- Build tất cả 6 APK (3 flavors × 2 build types) -----
+      - name: Build all APK variants
+        run: |
+          gradle :wallet:assemble --no-daemon --stacktrace
 
       - name: List generated APKs
         run: |
           find wallet/build/outputs/apk -name "*.apk" -type f
 
+      # ----- Upload unsigned APKs (đã được ký bằng debug key) -----
       - name: Upload unsigned APKs
         uses: actions/upload-artifact@v4
         with:
-          name: unsigned-apks
+          name: bitcoin-wallet-all-networks
           path: |
             wallet/build/outputs/apk/**/*.apk
