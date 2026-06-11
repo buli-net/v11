@@ -41,7 +41,6 @@ android {
     buildToolsVersion '36.1.0'
 
     defaultConfig {
-        // if you fork the app for an alt-coin, change this ID
         applicationId 'corp.wallet.bitcoin'
     }
 
@@ -59,10 +58,8 @@ android {
 
     flavorDimensions 'network'
     productFlavors {
-        Testnet { // capital T because testnet flavor not allowed
+        Testnet {
             dimension 'network'
-            // if you fork the app, replace the following applicationId by this:
-            // applicationIdSuffix '.testnet'
             applicationId 'de.schildbach.wallet_test'
         }
         Signet {
@@ -71,14 +68,12 @@ android {
         }
         Mainnet {
             dimension 'network'
-            // if you fork the app, replace the following applicationId by this:
-            // applicationIdSuffix '.mainnet'
             applicationId 'de.schildbach.wallet'
         }
     }
 
     sourceSets {
-        main { // configured for testnet by default
+        main {
             manifest.srcFile 'AndroidManifest.xml'
             java.srcDirs = ['src']
             res.srcDirs = ['res']
@@ -112,7 +107,7 @@ android {
         exclude 'META-INF/androidx/**/LICENSE.txt'
         exclude 'META-INF/*.version'
         exclude 'META-INF/proguard/**'
-        exclude 'META-INF/services/**' // ineffective, for some reason
+        exclude 'META-INF/services/**'
         exclude 'META-INF/*.kotlin_module'
         exclude 'META-INF/kotlin-project-structure-metadata.json'
         exclude 'META-INF/**/coroutines.pro'
@@ -136,7 +131,7 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all {
-            outputFileName = "../../" + // all outputs go to build/outputs/apk
+            outputFileName = "../../" +
                     "bitcoin-wallet-" +
                     "${variant.flavorName.toLowerCase()}-" +
                     "${variant.buildType.name}.apk"
