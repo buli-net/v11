@@ -14,19 +14,27 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      # Dùng JDK 11 (phù hợp với source/target 1.8)
-      - name: Setup JDK 11
+      # ----- SỬ DỤNG JDK 17 ĐỂ CHẠY SDKMANAGER (action setup-android yêu cầu) -----
+      - name: Setup JDK 17 for Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '11'
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          # Mặc định accept license tự động
 
-      # Cài Gradle 6.9.4 (đúng yêu cầu của project)
+      # ----- SAU KHI SDK ĐÃ SẴN SÀNG, CHUYỂN SANG JDK 11 ĐỂ BUILD -----
+      - name: Setup JDK 11 for build
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '11'
+
+      # ----- CÀI GRADLE 6.9.4 PHÙ HỢP VỚI PROJECT -----
       - name: Install Gradle 6.9.4
         run: |
           wget https://services.gradle.org/distributions/gradle-6.9.4-bin.zip
@@ -34,11 +42,11 @@ jobs:
           echo "/opt/gradle-6.9.4/bin" >> $GITHUB_PATH
           gradle --version
 
-      # Build tất cả các bản release (devRelease, prodRelease)
-      - name: Build release APKs
+      # ----- BUILD 2 BẢN RELEASE (HOẶC 4 BẢN) -----
+      - name: Build release APKs (assembleRelease)
         run: |
           gradle :wallet:assembleRelease --no-daemon --stacktrace
-          # Nếu muốn build cả 4 loại (devDebug, devRelease, prodDebug, prodRelease), thay dòng trên bằng:
+          # Để build cả 4 loại (devDebug, devRelease, prodDebug, prodRelease) thay dòng trên bằng:
           # gradle :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease --no-daemon --stacktrace
 
       - name: List generated APKs
