@@ -1,80 +1,83 @@
-name: Build Bitcoin Wallet - 10.x
+# =================================================================
+# FILE: .github/workflows/build-reproducible.yml
+# MỤC ĐÍCH: Mô phỏng lại quá trình build từ Dockerfile (reproducible)
+#            nhưng chạy trên GitHub Actions (Ubuntu)
+# CÁC BƯỚC CHÍNH:
+#   1. Cài JDK 21 (giống Dockerfile dùng openjdk-21)
+#   2. Cài Android SDK command-line tools (sdkmanager)
+#   3. Chấp nhận license của SDK
+#   4. Build APK bằng Gradle (có thể chọn assembleRelease hoặc cả 4 loại)
+#   5. Upload artifact (APK chưa ký)
+# =================================================================
+
+name: Reproducible Build (Dockerfile style)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # Chạy thủ công, có thể thêm push nếu muốn
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: v11.02
-          fetch-depth: 1
+    runs-on: ubuntu-22.04  # Ubuntu 22.04, tương thích với Debian
 
-      - name: Setup JDK 17 for SDK
+    steps:
+      # ----- 1. Lấy mã nguồn -----
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # ----- 2. Cài JDK 21 (giống Dockerfile: openjdk-21-jdk-headless) -----
+      - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: '17'
+          distribution: 'temurin'   # Hoặc 'zulu', 'adopt'
+          java-version: '21'
 
-      - name: Setup Android SDK 30
+      # ----- 3. Cài Android SDK command-line tools (để có sdkmanager) -----
+      #     GitHub runner có sẵn Android SDK nhưng để giống Dockerfile,
+      #     ta cài lại hoặc dùng action setup-android (đã có sdkmanager)
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-30 build-tools;30.0.3'
+          # Cài đặt các gói cần thiết (platform-tools, build-tools, platform 34)
+          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+          # Nếu muốn dùng sdkmanager riêng, có thể bỏ qua và dùng biến môi trường
 
-      - name: Setup JDK 11 for build
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '11'
-
-      - name: Setup Gradle 6.9.4
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '6.9.4'
-
-      - name: Fix dependencies
+      # ----- 4. Chấp nhận license SDK (tương tự lệnh yes | sdkmanager --licenses) -----
+      #     Action setup-android thường tự động accept license, nhưng để chắc chắn:
+      - name: Accept Android SDK licenses
         run: |
-          mkdir -p ~/.gradle/init.d
-          cat > ~/.gradle/init.d/fix-deps.gradle <<'EOF'
-          allprojects {
-            repositories { google(); mavenCentral() }
-            configurations.all {
-              resolutionStrategy {
-                force 'com.google.guava:guava:31.1-android'
-                force 'com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava'
-                force 'androidx.lifecycle:lifecycle-viewmodel:2.2.0'
-                force 'androidx.lifecycle:lifecycle-livedata:2.2.0'
-                force 'androidx.lifecycle:lifecycle-common:2.2.0'
-                force 'androidx.lifecycle:lifecycle-runtime:2.2.0'
-                force 'androidx.arch.core:core-runtime:2.1.0'
-                force 'androidx.arch.core:core-common:2.1.0'
-              }
-            }
-            tasks.withType(JavaCompile) {
-              sourceCompatibility = '1.8'
-              targetCompatibility = '1.8'
-            }
-            afterEvaluate {
-              if (it.hasProperty('android')) {
-                android.buildTypes.all {
-                  it.minifyEnabled false
-                  it.shrinkResources false
-                }
-              }
-            }
-          }
-          EOF
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          # Hoặc nếu dùng action setup-android, có thể không cần
 
-      - name: Build Debug APK
+      # ----- 5. Build APK (thay vì dùng gradle toàn cục, dùng gradle wrapper) -----
+      #     Dockerfile chạy: gradle clean :wallet:assembleRelease --exclude-task ...
+      #     Ta cũng build tương tự, nhưng có thể mở rộng thành 4 loại
+      - name: Build release APKs (assembleRelease)
         run: |
-          export ANDROID_HOME=$ANDROID_SDK_ROOT
-          export JAVA_HOME=$JAVA_HOME_11_X64
-          gradle :wallet:assembleDebug --no-daemon --stacktrace
+          chmod +x gradlew
+          # Build tất cả các bản release (devRelease, prodRelease)
+          ./gradlew clean :wallet:assembleRelease --no-daemon --stacktrace
+          # Nếu muốn build cả 4 loại, thay bằng:
+          # ./gradlew clean :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease --no-daemon --stacktrace
 
-      - name: Upload APK
+      # ----- 6. Liệt kê các file APK sinh ra để kiểm tra -----
+      - name: List generated APKs
+        run: |
+          find wallet/build/outputs/apk -name "*.apk" -type f
+
+      # ----- 7. Upload artifact (APK chưa ký, giống Dockerfile export) -----
+      - name: Upload unsigned APKs
         uses: actions/upload-artifact@v4
         with:
-          name: wallet-debug-apk
-          path: wallet/build/outputs/apk/debug/*.apk
+          name: unsigned-apks
+          path: |
+            wallet/build/outputs/apk/**/*.apk
+          # Đường dẫn sẽ bắt được tất cả APK trong các thư mục con
+
+      # ----- (Tùy chọn) Nếu muốn ký APK như trong Dockerfile, thêm bước ký -----
+      # - name: Sign release APKs (cần keystore secrets)
+      #   run: |
+      #     # Giải mã keystore, ký từng file
+      #     ...
