@@ -1,83 +1,60 @@
 # =================================================================
 # FILE: .github/workflows/build-reproducible.yml
-# MỤC ĐÍCH: Mô phỏng lại quá trình build từ Dockerfile (reproducible)
-#            nhưng chạy trên GitHub Actions (Ubuntu)
-# CÁC BƯỚC CHÍNH:
-#   1. Cài JDK 21 (giống Dockerfile dùng openjdk-21)
-#   2. Cài Android SDK command-line tools (sdkmanager)
-#   3. Chấp nhận license của SDK
-#   4. Build APK bằng Gradle (có thể chọn assembleRelease hoặc cả 4 loại)
-#   5. Upload artifact (APK chưa ký)
+# MỤC ĐÍCH: Mô phỏng Dockerfile build reproducible trên GitHub Actions
+#            (cài Gradle toàn cục, dùng Android SDK từ runner)
 # =================================================================
 
 name: Reproducible Build (Dockerfile style)
 
 on:
-  workflow_dispatch:  # Chạy thủ công, có thể thêm push nếu muốn
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Ubuntu 22.04, tương thích với Debian
+    runs-on: ubuntu-22.04
 
     steps:
-      # ----- 1. Lấy mã nguồn -----
       - name: Checkout source code
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      # ----- 2. Cài JDK 21 (giống Dockerfile: openjdk-21-jdk-headless) -----
       - name: Setup JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'   # Hoặc 'zulu', 'adopt'
+          distribution: 'temurin'
           java-version: '21'
 
-      # ----- 3. Cài Android SDK command-line tools (để có sdkmanager) -----
-      #     GitHub runner có sẵn Android SDK nhưng để giống Dockerfile,
-      #     ta cài lại hoặc dùng action setup-android (đã có sdkmanager)
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          # Cài đặt các gói cần thiết (platform-tools, build-tools, platform 34)
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
-          # Nếu muốn dùng sdkmanager riêng, có thể bỏ qua và dùng biến môi trường
 
-      # ----- 4. Chấp nhận license SDK (tương tự lệnh yes | sdkmanager --licenses) -----
-      #     Action setup-android thường tự động accept license, nhưng để chắc chắn:
-      - name: Accept Android SDK licenses
+      # ----- CÀI GRADLE TOÀN CỤC (giống Dockerfile) -----
+      - name: Install Gradle
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
-          # Hoặc nếu dùng action setup-android, có thể không cần
+          wget https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q gradle-8.5-bin.zip -d /opt
+          echo "/opt/gradle-8.5/bin" >> $GITHUB_PATH
+          # Xác nhận
+          gradle --version
 
-      # ----- 5. Build APK (thay vì dùng gradle toàn cục, dùng gradle wrapper) -----
-      #     Dockerfile chạy: gradle clean :wallet:assembleRelease --exclude-task ...
-      #     Ta cũng build tương tự, nhưng có thể mở rộng thành 4 loại
+      # ----- BUILD APK (dùng gradle toàn cục, không cần wrapper) -----
       - name: Build release APKs (assembleRelease)
         run: |
-          chmod +x gradlew
           # Build tất cả các bản release (devRelease, prodRelease)
-          ./gradlew clean :wallet:assembleRelease --no-daemon --stacktrace
-          # Nếu muốn build cả 4 loại, thay bằng:
-          # ./gradlew clean :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease --no-daemon --stacktrace
+          gradle :wallet:assembleRelease --no-daemon --stacktrace
+          # Nếu muốn build cả 4 loại, thay dòng trên bằng:
+          # gradle :wallet:assembleDevDebug :wallet:assembleDevRelease :wallet:assembleProdDebug :wallet:assembleProdRelease --no-daemon --stacktrace
 
-      # ----- 6. Liệt kê các file APK sinh ra để kiểm tra -----
       - name: List generated APKs
         run: |
           find wallet/build/outputs/apk -name "*.apk" -type f
 
-      # ----- 7. Upload artifact (APK chưa ký, giống Dockerfile export) -----
       - name: Upload unsigned APKs
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-apks
           path: |
             wallet/build/outputs/apk/**/*.apk
-          # Đường dẫn sẽ bắt được tất cả APK trong các thư mục con
-
-      # ----- (Tùy chọn) Nếu muốn ký APK như trong Dockerfile, thêm bước ký -----
-      # - name: Sign release APKs (cần keystore secrets)
-      #   run: |
-      #     # Giải mã keystore, ký từng file
-      #     ...
