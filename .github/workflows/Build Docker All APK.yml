@@ -1,0 +1,185 @@
+name: Build Bitcoin Wallet v11.04 - Docker (6 APKs + dual sign)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      # ------------------------------------------------------------------
+      # 0. Runner info - từ 10.26
+      # ------------------------------------------------------------------
+      - name: 0. Print runner info
+        run: |
+          echo "=== RUNNER INFO ==="
+          uname -a
+          date -u
+          echo "GitHub SHA: $GITHUB_SHA"
+
+      # ------------------------------------------------------------------
+      # 1. Checkout - giữ nguyên v5.0.0 Node24
+      # ------------------------------------------------------------------
+      - uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 0
+
+      - name: 1. Verify source commit
+        run: |
+          echo "=== SOURCE VERIFICATION ==="
+          git log -1 --pretty=full
+          git rev-parse HEAD > commit.txt
+
+      # ------------------------------------------------------------------
+      # 2. Setup JDK17 + Android SDK - cần cho apksigner (giống 10.26)
+      # ------------------------------------------------------------------
+      - uses: actions/setup-java@v5.0.0
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4.0.0
+
+      # ------------------------------------------------------------------
+      # 3. Enable Buildx - GIỮ NGUYÊN từ 11.04 (không dùng action cũ)
+      # ------------------------------------------------------------------
+      - name: 2. Enable Buildx (built-in)
+        run: |
+          docker buildx version
+          docker buildx create --use
+
+      # ------------------------------------------------------------------
+      # 4. Build - GIỮ NGUYÊN 100% từ 11.04
+      # ------------------------------------------------------------------
+      - name: 3. Build APKs with Docker (original Containerfile)
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --file build.Containerfile \
+            --target export-stage \
+            --output type=local,dest=out \
+            .
+          echo "=== RAW APKs AFTER BUILD ==="
+          ls -lh out/
+          sha256sum out/*.apk | tee out/raw-sha256.txt
+
+      # ------------------------------------------------------------------
+      # 5. Find apksigner - từ 10.26 (không hardcode)
+      # ------------------------------------------------------------------
+      - name: 4. Find apksigner
+        run: |
+          APK=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -1)
+          echo "APKSIGNER=$APK" >> $GITHUB_ENV
+          "$APK" --version
+
+      # ------------------------------------------------------------------
+      # 6. Decode keystore RIÊNG - từ 10.26
+      # ------------------------------------------------------------------
+      - name: 5. Decode private keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          keytool -list -v -keystore keystore.jks \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.KEY_ALIAS }}" | tee keystore-info.txt
+
+      # ------------------------------------------------------------------
+      # 7. KÝ 3 APK RELEASE bằng keystore riêng - KÝ TRỰC TIẾP từ file gốc
+      # ------------------------------------------------------------------
+      - name: 6. Sign 3 RELEASE APKs with PRIVATE key
+        run: |
+          set -e
+          shopt -s nullglob
+          mkdir -p signed
+          files=(out/*release*.apk)
+          for apk in "${files[@]}"; do
+            orig=$(basename "$apk")
+            clean=$(echo "$orig" | sed 's/-unsigned//' | sed 's/\.apk$//')
+            outname="${clean}-release-signed.apk"
+            echo ">> Signing RELEASE $orig -> $outname"
+            "$APKSIGNER" sign \
+              --ks keystore.jks \
+              --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
+              --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+              --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
+              --out "signed/$outname" "$apk"
+          done
+
+      # ------------------------------------------------------------------
+      # 8. KÝ 3 APK DEBUG bằng debug keystore mặc định - KHÔNG dùng key riêng
+      # ------------------------------------------------------------------
+      - name: 7. Sign 3 DEBUG APKs with DEBUG key
+        run: |
+          keytool -genkey -v -keystore /tmp/debug.keystore -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt 2>/dev/null || true
+          
+          files=(out/*debug*.apk)
+          for apk in "${files[@]}"; do
+            orig=$(basename "$apk")
+            clean=$(echo "$orig" | sed 's/\.apk$//')
+            outname="${clean}-debug-signed.apk"
+            echo ">> Signing DEBUG $orig -> $outname"
+            "$APKSIGNER" sign \
+              --ks /tmp/debug.keystore --ks-pass pass:android \
+              --ks-key-alias androiddebugkey --key-pass pass:android \
+              --out "signed/$outname" "$apk"
+          done
+          ls -lh signed/
+
+      # ------------------------------------------------------------------
+      # 9. Verify signatures - từ 10.26
+      # ------------------------------------------------------------------
+      - name: 8. Verify all signatures
+        run: |
+          for apk in signed/*.apk; do
+            echo "===== $(basename $apk) ====="
+            "$APKSIGNER" verify --verbose --print-certs "$apk"
+          done
+
+      # ------------------------------------------------------------------
+      # 10. Authenticity check - chỉ cho RELEASE
+      # ------------------------------------------------------------------
+      - name: 9. Authenticity check (RELEASE only)
+        env:
+          EXPECTED_SHA256: ${{ secrets.EXPECTED_CERT_SHA256 }}
+        run: |
+          for apk in signed/*release-signed.apk; do
+            ACTUAL=$("$APKSIGNER" verify --print-certs "$apk" | grep SHA-256 | awk '{print $NF}')
+            echo "$(basename $apk): $ACTUAL"
+            if [ -n "$EXPECTED_SHA256" ] && [ "$ACTUAL" != "$EXPECTED_SHA256" ]; then
+              echo "❌ Fingerprint mismatch!"; exit 1
+            fi
+          done
+
+      # ------------------------------------------------------------------
+      # 11. Dump APK info - từ 10.26
+      # ------------------------------------------------------------------
+      - name: 10. Dump APK metadata
+        run: |
+          BUILD_DIR=$(dirname "$APKSIGNER")
+          AAPT="$BUILD_DIR/aapt"
+          [ -x "$AAPT" ] || AAPT=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)
+          for apk in signed/*.apk; do
+            echo "--- $(basename $apk) ---"
+            "$AAPT" dump badging "$apk" | grep -E "package:|versionName|versionCode"
+          done
+
+      # ------------------------------------------------------------------
+      # 12. Generate report + upload
+      # ------------------------------------------------------------------
+      - name: 11. Generate report
+        run: |
+          {
+            echo "===== BITCOIN WALLET v11.04 BUILD REPORT ====="
+            date -u; echo "Commit: $(cat commit.txt)"; echo ""
+            echo "--- SHA256 ---"; sha256sum signed/*.apk
+          } | tee report.txt
+
+      - name: 12. Upload artifacts
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: bitcoin-wallet-v11.04-6apks
+          path: |
+            signed/*.apk
+            report.txt
+            keystore-info.txt
+            out/raw-sha256.txt
