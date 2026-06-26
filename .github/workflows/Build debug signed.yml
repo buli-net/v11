@@ -1,0 +1,42 @@
+name: Build Bitcoin Wallet v11.04 - Docker (original + debug sign)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3.14.0   # <— fix ở đây
+
+      - name: Build (giữ nguyên Containerfile)
+        run: |
+          DOCKER_BUILDKIT=1 docker build \
+            --file build.Containerfile \
+            --target export-stage \
+            --output type=local,dest=out \
+            .
+
+      - name: Show APKs
+        run: ls -lh out/
+
+      - name: Sign with debug keystore
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq apksigner
+          keytool -genkey -v -keystore /tmp/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt 2>/dev/null || true
+          mkdir -p signed
+          for apk in out/*.apk; do
+            base=$(basename "$apk" .apk)
+            apksigner sign --ks /tmp/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --out "signed/${base}-debug-signed.apk" "$apk"
+          done
+
+      - name: Upload signed APKs
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: bitcoin-wallet-v11.04-signed
+          path: signed/*.apk
