@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet v11.04 - Docker
+name: Build Bitcoin Wallet v11.04 - Full Docker
 
 on:
   workflow_dispatch:
@@ -13,22 +13,40 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3.11.1
 
-      - name: Build with Docker (BuildKit)
+      - name: Patch Containerfile for all variants
         run: |
-          # v11.04 dùng cache mounts nên bắt buộc BuildKit
+          # File gốc chỉ build assembleRelease, mình thay bằng build all
+          sed -i 's|:wallet:assembleRelease|:wallet:assembleDebug :wallet:assembleRelease|' build.Containerfile
+          # bỏ exclude-task để build luôn signet/testnet/mainnet
+          sed -i '/--exclude-task/d' build.Containerfile
+          # sửa COPY để lấy hết apk
+          sed -i 's|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk/bitcoin-wallet-*-release.apk /|COPY --from=build-stage /home/builder/project/wallet/build/outputs/apk /apk|' build.Containerfile
+
+      - name: Build all APKs
+        run: |
           DOCKER_BUILDKIT=1 docker build \
             --file build.Containerfile \
             --target export-stage \
             --output type=local,dest=out \
             .
 
-      - name: List APKs
-        run: |
-          echo "APKs built:"
-          find out -name "*.apk" -ls
+      - name: List built APKs
+        run: find out -name "*.apk" -ls
 
-      - name: Upload artifact (unsigned)
+      - name: Sign all with debug keystore
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq apksigner
+          keytool -genkey -v -keystore /tmp/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US" -noprompt 2>/dev/null || true
+          
+          mkdir -p signed
+          find out -name "*.apk" | while read apk; do
+            name=$(basename "$apk")
+            apksigner sign --ks /tmp/debug.keystore --ks-pass pass:android --ks-key-alias androiddebugkey --key-pass pass:android --out "signed/${name%.apk}-signed.apk" "$apk"
+          done
+          ls -lh signed/
+
+      - name: Upload signed APKs
         uses: actions/upload-artifact@v6.0.0
         with:
-          name: bitcoin-wallet-v11.04-unsigned
-          path: out/*.apk
+          name: bitcoin-wallet-v11.04-all-signed
+          path: signed/*.apk
