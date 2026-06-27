@@ -10,11 +10,14 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: JDK 17 for SDK
         uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '17' }
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Android SDK 28
         uses: android-actions/setup-android@v3
@@ -22,25 +25,51 @@ jobs:
           cmdline-tools-version: 11076708
           packages: 'platform-tools platforms;android-28 build-tools;28.0.3'
 
-      - name: JDK 8 for Gradle
+      - name: JDK 8 for Gradle 3.1.4
         uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: '8' }
+        with:
+          distribution: temurin
+          java-version: '8'
 
-      - run: echo "sdk.dir=$ANDROID_HOME" > local.properties
-      - run: chmod +x gradlew
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+
+      - name: Tạo local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Fix gradlew (tìm hoặc tạo mới)
+        run: |
+          GRADLEW_PATH=$(find . -name gradlew -type f | head -1)
+          
+          if [ -z "$GRADLEW_PATH" ]; then
+            echo "Không thấy gradlew -> tạo wrapper"
+            wget -q https://services.gradle.org/distributions/gradle-4.10.3-bin.zip
+            unzip -q gradle-4.10.3-bin.zip
+            export PATH=$PWD/gradle-4.10.3/bin:$PATH
+            gradle wrapper --gradle-version 4.10.3
+            GRADLEW_PATH=./gradlew
+          fi
+          
+          chmod +x $GRADLEW_PATH
+          echo "GRADLEW=$GRADLEW_PATH" >> $GITHUB_ENV
 
       - name: Prepare buli keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo $KEYSTORE_BASE64 | base64 -d > $GITHUB_WORKSPACE/buli.jks
 
-      - name: Build Release + ký luôn bằng Gradle
+      - name: Build Release + ký luôn bằng key buli
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          ./gradlew clean \
+          $GRADLEW clean \
             :wallet:assembleProdRelease \
             :wallet:assembleTestRelease \
             :wallet:assembleSignetRelease \
@@ -52,13 +81,13 @@ jobs:
 
       - name: Copy APKs
         run: |
-          mkdir output
+          mkdir -p output
           cp wallet/build/outputs/apk/prod/release/wallet-prod-release.apk output/BitcoinWallet-prod-v11.apk
           cp wallet/build/outputs/apk/test/release/wallet-test-release.apk output/BitcoinWallet-test-v11.apk
           cp wallet/build/outputs/apk/signet/release/wallet-signet-release.apk output/BitcoinWallet-signet-v11.apk
 
-      - name: Upload
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: v11-gradle-signed
+          name: v11-release-buli-signed
           path: output/*.apk
