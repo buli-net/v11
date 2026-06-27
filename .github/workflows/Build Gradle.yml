@@ -10,60 +10,56 @@ jobs:
       ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: JDK 17 for SDK
         uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: { distribution: temurin, java-version: '17' }
 
-      - name: Android SDK 28
+      - name: Android SDK 28 (dùng tools cũ)
         uses: android-actions/setup-android@v3
         with:
-          cmdline-tools-version: 11076708
+          # bản 7583922 = trước khi có API 34-37, tránh lỗi 37.0
+          cmdline-tools-version: 7583922
           packages: 'platform-tools platforms;android-28 build-tools;28.0.3'
 
-      - name: JDK 8 for Gradle 3.1.4
+      - name: Patch SDK metadata cho Gradle 3.1.4
+        run: |
+          # Gradle 3.x không đọc được "37.0" và tag <extension-level>
+          find $ANDROID_HOME -name package.xml -type f -exec sed -i 's/\.0<\/api-level>/<\/api-level>/g' {} \;
+          find $ANDROID_HOME -name package.xml -type f -exec sed -i 's/<extension-level>.*<\/extension-level>//g' {} \;
+
+      - name: JDK 8 for Gradle
         uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '8'
+        with: { distribution: temurin, java-version: '8' }
 
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          path: ~/.gradle/caches,~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*') }}
 
-      - name: Tạo local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-      - name: Fix gradlew (tìm hoặc tạo mới)
+      - name: Fix gradlew
         run: |
-          GRADLEW_PATH=$(find . -name gradlew -type f | head -1)
-          
-          if [ -z "$GRADLEW_PATH" ]; then
-            echo "Không thấy gradlew -> tạo wrapper"
+          GRADLEW=$(find . -name gradlew -type f | head -1)
+          if [ -z "$GRADLEW" ]; then
             wget -q https://services.gradle.org/distributions/gradle-4.10.3-bin.zip
             unzip -q gradle-4.10.3-bin.zip
             export PATH=$PWD/gradle-4.10.3/bin:$PATH
             gradle wrapper --gradle-version 4.10.3
-            GRADLEW_PATH=./gradlew
+            GRADLEW=./gradlew
           fi
-          
-          chmod +x $GRADLEW_PATH
-          echo "GRADLEW=$GRADLEW_PATH" >> $GITHUB_ENV
+          chmod +x $GRADLEW
+          echo "GRADLEW=$GRADLEW" >> $GITHUB_ENV
 
       - name: Prepare buli keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: echo $KEYSTORE_BASE64 | base64 -d > $GITHUB_WORKSPACE/buli.jks
 
-      - name: Build Release + ký luôn bằng key buli
+      - name: Build Release + ký luôn
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -81,13 +77,12 @@ jobs:
 
       - name: Copy APKs
         run: |
-          mkdir -p output
+          mkdir output
           cp wallet/build/outputs/apk/prod/release/wallet-prod-release.apk output/BitcoinWallet-prod-v11.apk
           cp wallet/build/outputs/apk/test/release/wallet-test-release.apk output/BitcoinWallet-test-v11.apk
           cp wallet/build/outputs/apk/signet/release/wallet-signet-release.apk output/BitcoinWallet-signet-v11.apk
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: v11-release-buli-signed
+          name: v11-release-buli
           path: output/*.apk
