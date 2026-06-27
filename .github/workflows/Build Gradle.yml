@@ -1,4 +1,4 @@
-name: Build Bitcoin Wallet v11 - All Flavors
+name: Build v11 - Release signed by Gradle
 
 on:
   workflow_dispatch:
@@ -7,68 +7,58 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true   # tắt cảnh báo Node 20
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      # ---- B1: JDK 17 để cài SDK (sdkmanager mới cần 17) ----
-      - name: Setup JDK 17 for Android SDK
+      - name: JDK 17 for SDK
         uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+        with: { distribution: temurin, java-version: '17' }
 
-      - name: Setup Android SDK
+      - name: Android SDK 28
         uses: android-actions/setup-android@v3
         with:
-          # dùng cmdline-tools cũ, tương thích với build-tools 28
           cmdline-tools-version: 11076708
           packages: 'platform-tools platforms;android-28 build-tools;28.0.3'
 
-      # ---- B2: Chuyển về JDK 8 để build Gradle 3.1.4 ----
-      - name: Switch to JDK 8 for Gradle
+      - name: JDK 8 for Gradle
         uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '8'
+        with: { distribution: temurin, java-version: '8' }
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+      - run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+      - run: chmod +x gradlew
 
-      - name: Create local.properties
-        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
-
-      # ---- B3: Build cả 3 phiên bản mặc định ----
-      - name: Build Prod + Test + Signet (Release)
-        run: ./gradlew clean :wallet:assembleProdRelease :wallet:assembleTestRelease :wallet:assembleSignetRelease -x lint --stacktrace
-
-      # ---- B4: Ký bằng key buli.jks của bạn (giữ nguyên như bản bạn đang dùng) ----
-      - name: Sign APKs
+      - name: Prepare buli keystore
         env:
-          KEYSTORE_BASE64: ${{ secrets.BULI_KEYSTORE }}
-        run: |
-          echo $KEYSTORE_BASE64 | base64 -d > buli.jks
-          for flavor in prod test signet; do
-            IN=wallet/build/outputs/apk/$flavor/release/wallet-$flavor-release.apk
-            OUT=wallet-$flavor-v11-signed.apk
-            $ANDROID_HOME/build-tools/28.0.3/apksigner sign \
-              --ks buli.jks --ks-key-alias buli \
-              --ks-pass pass:android --key-pass pass:android \
-              --out $OUT $IN
-          done
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo $KEYSTORE_BASE64 | base64 -d > $GITHUB_WORKSPACE/buli.jks
 
-      - name: Upload all 3 APKs
+      - name: Build Release + ký luôn bằng Gradle
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          ./gradlew clean \
+            :wallet:assembleProdRelease \
+            :wallet:assembleTestRelease \
+            :wallet:assembleSignetRelease \
+            -x lint \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/buli.jks \
+            -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$KEY_PASSWORD
+
+      - name: Copy APKs
+        run: |
+          mkdir output
+          cp wallet/build/outputs/apk/prod/release/wallet-prod-release.apk output/BitcoinWallet-prod-v11.apk
+          cp wallet/build/outputs/apk/test/release/wallet-test-release.apk output/BitcoinWallet-test-v11.apk
+          cp wallet/build/outputs/apk/signet/release/wallet-signet-release.apk output/BitcoinWallet-signet-v11.apk
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: bitcoin-wallet-v11-all-flavors
-          path: wallet-*-v11-signed.apk
+          name: v11-gradle-signed
+          path: output/*.apk
